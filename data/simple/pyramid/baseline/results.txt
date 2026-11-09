@@ -1,0 +1,10 @@
+Mean angular error: 0.181052 deg
+95th percentile: 0.000005 deg
+Maximum: 23.355283 deg
+Evaluated pixels: 44100
+Invalid interior pixels: 0
+Light matrix condition: 1.685394
+Mean intensity residual: 0.00000050
+Minimum reference normal dot light: 0.434795
+All interior observations positive: True
+Method: ordinary LS; no IRLS, no height reconstruction.

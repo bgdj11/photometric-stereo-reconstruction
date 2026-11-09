@@ -1,0 +1,11 @@
+Scene: complex/bump/scene.blend
+Blender: 5.2.3 LTS
+Images: 6
+Resolution: 256 x 256
+Samples: 16
+Sun strength: 2.0
+Angles (azimuth, tilt): [(0.0, 40), (60.0, 40), (120.0, 40), (180.0, 40), (240.0, 40), (300.0, 40)]
+Camera matrix: [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 4.0], [0.0, 0.0, 0.0, 1.0]]
+Ortho scale: 2.4000000953674316
+Images: scene-linear float32 EXR; fixed camera; world XYZ normals.
+Diffuse bounces: 0; denoising: off; seed: 42.
