@@ -1,3 +1,4 @@
 numpy==2.5.4
 matplotlib==3.11.2
 OpenEXR==3.5.3
+scipy==1.18.1
