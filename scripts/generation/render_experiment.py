@@ -7,11 +7,19 @@ from mathutils.bvhtree import BVHTree
 
 SCENES = ['simple/plane', 'simple/tilted', 'simple/pyramid',
           'complex/bump', 'complex/terrain', 'complex/waves']
+
 EXPERIMENT = 'baseline' # just name
+LIGHT_TYPE = 'SUN'  # 'SUN', 'POINT' or 'SPOT'
 LIGHT_COUNT = 6
 TILT_DEGREES = 40
 CUSTOM_ANGLES = [] # option (az, nagib)
 SUN_STRENGTH = 2.0
+
+# additional params
+LAMP_POWER = 100.0  # W, only  POINT/SPOT sun is different
+LIGHT_DISTANCE = 2.0  # distance from origin to light, only POINT/SPOT
+SPOT_ANGLE = 90.0  # angle of cone for SPOT
+SPOT_BLEND = 0.7  # blend factor for SPOT, 0=hard edge, 1=soft edge
 RESOLUTION = 256
 SAMPLES = 16
 DATA = Path(__file__).resolve().parents[2] / 'data'
@@ -60,7 +68,7 @@ def render_experiment(name):
     surfaces = [obj for obj in scene.objects if obj.type == 'MESH' and not obj.hide_render]
     lights = [obj for obj in scene.objects if obj.type == 'LIGHT' and not obj.hide_render]
 
-    sun = lights[0]
+    lamp = lights[0]
     angles = CUSTOM_ANGLES or [(float(a), TILT_DEGREES)
                               for a in np.linspace(0, 360, LIGHT_COUNT, endpoint=False)]
     directions = []
@@ -89,33 +97,62 @@ def render_experiment(name):
     scene.render.image_settings.file_format = 'OPEN_EXR'
     scene.render.image_settings.color_depth = '32'
     scene.render.image_settings.color_mode = 'RGB'
-    sun.data.energy, sun.data.angle = SUN_STRENGTH, 0
-    sun.rotation_mode = 'XYZ'
+    lamp.data.type = LIGHT_TYPE
+    lamp.rotation_mode = 'XYZ'
+    if LIGHT_TYPE == 'SUN':
+        lamp.data.energy, lamp.data.angle = SUN_STRENGTH, 0
+    else:
+        lamp.data.energy = LAMP_POWER
+        lamp.data.shadow_soft_size = 0
+        if LIGHT_TYPE == 'SPOT':
+            lamp.data.spot_size = math.radians(SPOT_ANGLE)
+            lamp.data.spot_blend = SPOT_BLEND
     bpy.context.view_layer.update()
     truth, points = reference_surface(scene, surfaces[0])
     (folder / 'images').mkdir(parents=True)
 
   
     for index, (azimuth, tilt) in enumerate(angles):
-        sun.rotation_euler = (0, math.radians(tilt), math.radians(azimuth))
+        if LIGHT_TYPE == 'SUN':
+            lamp.rotation_euler = (0, math.radians(tilt), math.radians(azimuth))
+        else:
+            lamp.location = (LIGHT_DISTANCE * L[index]).tolist()
+
+            # for POINT/SPOT, rotate lamp to point at world origin
+            lamp.rotation_euler = Vector((-L[index]).tolist()).to_track_quat('-Z', 'Y').to_euler()
         bpy.context.view_layer.update()
-        actual = np.array(sun.matrix_world.to_3x3() @ Vector((0, 0, 1)))
 
         scene.render.filepath = str(folder / 'images' / f'light_{index:02d}.exr')
         bpy.ops.render.render(write_still=True)
 
 
     # save
-    np.savetxt(folder/'lights.txt', L, fmt='%.10f', header='lx ly lz; one row per image, surface -> source')
+    description = ('SUN directions, same at every point' if LIGHT_TYPE == 'SUN' else
+                   'APPROXIMATE directions at world origin; LS/IRLS ignore local variation')
+    np.savetxt(folder/'lights.txt', L, fmt='%.10f', header='lx ly lz; surface -> source; '+description)
+    if LIGHT_TYPE != 'SUN':
+        np.savetxt(folder/'light_positions.txt', LIGHT_DISTANCE*L, header='world X Y Z; one row per image')
+    if LIGHT_TYPE == 'SPOT':
+        np.savetxt(folder/'spot.txt', np.column_stack([
+            -L, np.full(len(L), SPOT_ANGLE), np.full(len(L), SPOT_BLEND)]),
+            header='axis X Y Z (lamp -> scene), full cone angle degrees, blend')
     np.save(folder/'reference_normals.npy', truth)
     np.save(folder/'surface_points.npy', points)
     settings = (f'Scene: {name}/scene.blend\nBlender: {bpy.app.version_string}\n'
                 f'Images: {len(L)}\nResolution: {RESOLUTION} x {RESOLUTION}\nSamples: {SAMPLES}\n'
-                f'Sun strength: {SUN_STRENGTH}\nAngles (azimuth, tilt): {angles}\n'
+                f'Light type: {LIGHT_TYPE}\n'
+                f'Strength: {SUN_STRENGTH if LIGHT_TYPE == "SUN" else LAMP_POWER}; '
+                f'units: {"Sun strength" if LIGHT_TYPE == "SUN" else "W"}\n'
+                f'Angles (azimuth, tilt): {angles}\n'
                 f'Camera matrix: {[list(row) for row in scene.camera.matrix_world]}\n'
                 f'Ortho scale: {scene.camera.data.ortho_scale}\n'
                 'Images: scene-linear float32 EXR; fixed camera; world XYZ normals.\n'
                 'Diffuse bounces: 0; denoising: off; seed: 42.\n')
+    
+    if LIGHT_TYPE != 'SUN':
+        settings += f'Distance from origin: {LIGHT_DISTANCE}; source radius: 0\n{description}\n'
+    if LIGHT_TYPE == 'SPOT':
+        settings += f'Spot angle: {SPOT_ANGLE}; blend: {SPOT_BLEND}; aimed at world origin\n'
     (folder/'settings.txt').write_text(settings, encoding='utf-8')
     print('saved:', folder)
 
