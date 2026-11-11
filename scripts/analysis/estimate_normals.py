@@ -7,11 +7,13 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT))
-from scripts.algorithms.ls import estimate_normals, angular_error
+from scripts.algorithms import ls, irls
+from scripts.algorithms.ls import angular_error
 from scripts.analysis.inspect_normal_errors import draw_errors_3d
 
 DATA = PROJECT / 'data'
 DATASET = None  # None = all or 'simple/pyramid/baseline'.
+METHOD = 'LS'  # ls or irsl
 
 
 def load_images(folder, count):
@@ -32,7 +34,7 @@ def interior_mask(normals):
     return mask
 
 
-def plot_results(folder, images, truth, estimated, mask, error):
+def plot_results(folder, images, truth, estimated, mask, error, method='LS'):
     cols = min(3, len(images))
     rows = (len(images) + cols - 1) // cols
     fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 3.5*rows), squeeze=False)
@@ -40,11 +42,14 @@ def plot_results(folder, images, truth, estimated, mask, error):
     for ax in axes.flat:
         ax.axis('off')
 
-    for index, (ax, photo) in enumerate(zip(axes.flat, images)):
-        ax.imshow(photo, cmap='gray', vmin=0, vmax=float(images.max()))
+    linear = np.clip(images / max(float(images.max()), 1e-12), 0, 1)
+    display = np.where(linear <= 0.0031308, 12.92*linear,
+                       1.055*linear**(1/2.4)-0.055)
+    for index, (ax, photo) in enumerate(zip(axes.flat, display)):
+        ax.imshow(photo, cmap='gray', vmin=0, vmax=1)
         ax.set_title(f'Light {index}')
 
-    fig.suptitle('Input images: fixed camera and surface, changing light direction')
+    fig.suptitle('Input images: shared brightness scale, sRGB display; algorithms use linear EXR')
     fig.tight_layout()
     fig.savefig(folder/'images.png', dpi=130)
     plt.close(fig)
@@ -56,7 +61,7 @@ def plot_results(folder, images, truth, estimated, mask, error):
     axes[0].imshow(colors(truth))
     axes[0].set_title('Known normals (evaluation only)')
     axes[1].imshow(colors(estimated))
-    axes[1].set_title('Normals estimated by LS')
+    axes[1].set_title(f'Normals estimated by {method}')
     plot = axes[2].imshow(np.where(mask, error, np.nan), cmap='magma',
                           vmin=0, vmax=max(0.01, float(error[mask].max())))
     axes[2].set_title('Angular error')
@@ -69,10 +74,13 @@ def plot_results(folder, images, truth, estimated, mask, error):
 
 
 def estimate_dataset_normals(folder):
+    if METHOD not in ('LS', 'IRLS'):
+        raise ValueError('METHOD mora biti LS ili IRLS.')
     L = np.loadtxt(folder/'lights.txt', ndmin=2)
     images = load_images(folder, len(L))
 
-    estimated, scale, residual, valid = estimate_normals(images, L)
+    solver = ls if METHOD == 'LS' else irls
+    estimated, scale, residual, valid = solver.estimate_normals(images, L)
     np.save(folder/'estimated_normals.npy', estimated)
 
 
@@ -94,15 +102,18 @@ def estimate_dataset_normals(folder):
               f'Mean intensity residual: {residual[mask].mean():.8f}\n'
               f'Minimum reference normal dot light: {min_dot:.6f}\n'
               f'All interior observations positive: {positive}\n'
-              'Method: ordinary LS; no IRLS, no height reconstruction.\n')
+              f'Method: {METHOD}; one global light matrix; normals only.\n')
+    if (folder/'light_positions.txt').exists():
+        report += ('Point/Spot experiment: lights.txt uses approximate directions at world origin.\n'
+                   'Global LS/IRLS ignores local directions, distance attenuation and beam profile.\n')
     
     (folder/'results.txt').write_text(report, encoding='utf-8')
-    plot_results(folder, images, truth, estimated, mask, error)
+    plot_results(folder, images, truth, estimated, mask, error, METHOD)
 
     if (folder/'surface_points.npy').exists():
         draw_errors_3d(folder, show=False)
 
-    print(f'{folder.relative_to(DATA)}: mean error {errors.mean():.6f} deg')
+    print(f'{folder.relative_to(DATA)} [{METHOD}]: mean error {errors.mean():.6f} deg')
 
 
 if __name__ == '__main__':

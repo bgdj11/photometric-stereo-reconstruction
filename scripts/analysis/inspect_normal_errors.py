@@ -69,7 +69,7 @@ def draw_errors_3d(folder, show=False):
             ax.text(*point, str(number), color='deepskyblue', zorder=5)
         labels.append(f'{number}: pixel ({row}, {col}), error {error[row, col]:.2f} deg')
     right.legend(handles=[Line2D([0], [0], color='tab:green', label='Known normal'),
-                          Line2D([0], [0], color='tab:red', label='LS estimate')], loc='upper left')
+                          Line2D([0], [0], color='tab:red', label='Estimated normal')], loc='upper left')
     left.set_title('Error mapped onto the original surface')
     right.set_title('Known and estimated normals at marked points')
 
