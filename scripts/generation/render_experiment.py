@@ -5,11 +5,10 @@ import numpy as np
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
-SCENES = ['simple/plane', 'simple/tilted', 'simple/pyramid',
-          'complex/bump', 'complex/terrain', 'complex/waves']
+SCENES = ['complex/terrain', 'simple/pyramid']
 
-EXPERIMENT = 'baseline' # just name
-LIGHT_TYPE = 'SUN'  # 'SUN', 'POINT' or 'SPOT'
+EXPERIMENT = 'spot_baseline'
+LIGHT_TYPE = 'SPOT'  # 'SUN', 'POINT' or 'SPOT'
 LIGHT_COUNT = 6
 TILT_DEGREES = 40
 CUSTOM_ANGLES = [] # option (az, nagib)
@@ -20,7 +19,7 @@ LAMP_POWER = 100.0  # W, only  POINT/SPOT sun is different
 LIGHT_DISTANCE = 2.0  # distance from origin to light, only POINT/SPOT
 SPOT_ANGLE = 90.0  # angle of cone for SPOT
 SPOT_BLEND = 0.7  # blend factor for SPOT, 0=hard edge, 1=soft edge
-RESOLUTION = 256
+RESOLUTION = 128
 SAMPLES = 16
 DATA = Path(__file__).resolve().parents[2] / 'data'
 
