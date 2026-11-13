@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.ndimage import label
 from scipy.sparse import coo_matrix
 from scipy.sparse.linalg import lsmr
 
@@ -13,11 +12,10 @@ from scipy.sparse.linalg import lsmr
 # h* = argmin ||Ah - d||^2
 
 
-def reconstruct_height(normals, image_width=1.0):
+def reconstruct_height(normals, image_width):
 
     normals = np.asarray(normals, dtype=float)
 
-    
     mask = np.isfinite(normals).all(axis=-1) & (normals[..., 2] > 1e-6)
 
     p, q = np.zeros(mask.shape), np.zeros(mask.shape)
@@ -47,7 +45,8 @@ def reconstruct_height(normals, image_width=1.0):
     result = lsmr(A, differences, atol=1e-8, btol=1e-8, maxiter=5000)
     
     heights = np.full(mask.shape, np.nan)
-    heights[mask] = result[0] - result[0].min()
+
+    heights[mask] = result[0] - result[0].mean()
 
     return heights
 
